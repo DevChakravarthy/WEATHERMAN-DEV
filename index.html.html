@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WEATHERMAN DEV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Archivo+Expanded:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    --casing: #0b1512;
+    --screen: #03110c;
+    --screen-edge: #061e15;
+    --phosphor: #55ffab;
+    --phosphor-dim: rgba(85,255,171,0.22);
+    --phosphor-faint: rgba(85,255,171,0.09);
+    --amber: #ffb14e;
+    --amber-dim: rgba(255,177,78,0.25);
+    --cream: #dbeee2;
+    --cream-dim: #7fa393;
+    --danger: #ff6b5e;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: radial-gradient(ellipse at 50% -10%, #12241d 0%, #060d0a 55%, #030706 100%);
+    color: var(--cream);
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding: 28px 16px;
+  }
+  .console{
+    width: 100%;
+    max-width: 1180px;
+    background: linear-gradient(180deg, #101f19 0%, #0a1712 100%);
+    border-radius: 18px;
+    padding: 22px;
+    border: 1px solid #1c3327;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+  .topbar{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 4px 8px 18px 8px;
+    border-bottom: 1px solid #1c3327;
+    margin-bottom: 18px;
+  }
+  .brand{
+    font-family:'Archivo Expanded', sans-serif;
+    font-weight:700;
+    font-size: 22px;
+    letter-spacing: 0.02em;
+    color: var(--phosphor);
+    text-shadow: 0 0 18px rgba(85,255,171,0.35);
+  }
+  .brand span{ color: var(--cream-dim); font-weight:600; }
+  .search{
+    display:flex;
+    gap:8px;
+  }
+  .search input{
+    background: #071510;
+    border: 1px solid #1c3327;
+    color: var(--phosphor);
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    width: 180px;
+    outline: none;
+  }
+  .search input::placeholder{ color: #3d6a55; }
+  .search input:focus{ border-color: var(--phosphor); }
+  .search button{
+    background: var(--phosphor);
+    color: #03110c;
+    border: none;
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:600;
+    font-size: 13px;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor:pointer;
+  }
+  .search button:hover{ background:#7bffbf; }
+
+  .layout{
+    display:grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+  }
+  @media (max-width: 720px){
+    .layout{ grid-template-columns: 1fr; }
+  }
+
+  .scope-wrap{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap: 12px;
+  }
+  .scope{
+    position:relative;
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, var(--screen) 0%, var(--screen-edge) 92%, #0d2318 100%);
+    box-shadow: inset 0 0 40px rgba(0,0,0,0.7), 0 0 0 6px #0a1a13, 0 0 0 7px #1c3327;
+    overflow:hidden;
+  }
+  .ring{
+    position:absolute;
+    border:1px solid var(--phosphor-faint);
+    border-radius:50%;
+    top:50%; left:50%;
+    transform:translate(-50%,-50%);
+  }
+  .crosshair{
+    position:absolute;
+    background: var(--phosphor-faint);
+  }
+  .crosshair.h{ width:100%; height:1px; top:50%; left:0; }
+  .crosshair.v{ height:100%; width:1px; left:50%; top:0; }
+
+  .sweep{
+    position:absolute;
+    top:50%; left:50%;
+    width:50%; height:2px;
+    transform-origin: left center;
+    background: linear-gradient(90deg, var(--phosphor) 0%, transparent 100%);
+    animation: rotate 5s linear infinite;
+    filter: drop-shadow(0 0 6px var(--phosphor));
+  }
+  .sweep-fill{
+    position:absolute;
+    top:50%; left:50%;
+    width:150px; height:150px;
+    transform-origin: left center;
+    background: conic-gradient(from 0deg, var(--phosphor-dim), transparent 32deg);
+    animation: rotate 5s linear infinite;
+  }
+  @keyframes rotate{ from{ transform: translate(0,-50%) rotate(0deg);} to{ transform: translate(0,-50%) rotate(360deg);} }
+
+  .blip{
+    position:absolute;
+    width:8px; height:8px;
+    border-radius:50%;
+    background: var(--amber);
+    box-shadow: 0 0 10px var(--amber), 0 0 2px #fff;
+    transform: translate(-50%,-50%);
+  }
+  .blip.small{ width:5px; height:5px; opacity:0.75; }
+
+  .scope-center{
+    position:absolute; top:50%; left:50%;
+    width:6px; height:6px;
+    background: var(--phosphor);
+    border-radius:50%;
+    transform:translate(-50%,-50%);
+    box-shadow: 0 0 8px var(--phosphor);
+  }
+  .compass{
+    position:absolute;
+    font-size: 10px;
+    color: var(--cream-dim);
+    letter-spacing: 0.1em;
+  }
+  .compass.n{ top:6px; left:50%; transform:translateX(-50%); }
+  .compass.s{ bottom:6px; left:50%; transform:translateX(-50%); }
+  .compass.e{ right:8px; top:50%; transform:translateY(-50%); }
+  .compass.w{ left:8px; top:50%; transform:translateY(-50%); }
+
+  .scope-caption{
+    font-size: 11px;
+    color: var(--cream-dim);
+    letter-spacing: 0.08em;
+    text-align:center;
+    line-height:1.6;
+  }
+  .scope-caption b{ color: var(--amber); font-weight:600; }
+
+  .scope-hud{
+    position:absolute;
+    display:flex;
+    justify-content:space-between;
+    top:10px; left:14px; right:14px;
+    font-size: 10px;
+    color: var(--phosphor);
+    letter-spacing: 0.06em;
+    z-index:5;
+    text-shadow: 0 0 6px rgba(85,255,171,0.5);
+  }
+  .scope-temp{
+    position:absolute;
+    bottom:14px; left:0; right:0;
+    text-align:center;
+    z-index:5;
+    font-family:'Archivo Expanded', sans-serif;
+    font-weight:700;
+    font-size: 15px;
+    color: var(--cream);
+    text-shadow: 0 0 10px rgba(0,0,0,0.8);
+  }
+
+  .cloud{
+    position:absolute;
+    border-radius:50%;
+    background: radial-gradient(circle, rgba(219,238,226,0.16) 0%, rgba(219,238,226,0.05) 55%, transparent 75%);
+    filter: blur(2px);
+    animation-name: drift;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    z-index:2;
+  }
+  @keyframes drift{
+    from{ transform: translateX(-40px); }
+    to{ transform: translateX(340px); }
+  }
+
+  .wind-streak{
+    position:absolute;
+    height:1px;
+    background: linear-gradient(90deg, transparent, var(--phosphor) 60%, transparent);
+    opacity:0;
+    z-index:3;
+    animation-name: streak;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+  @keyframes streak{
+    0%{ opacity:0; transform: translateX(0); }
+    8%{ opacity:0.65; }
+    85%{ opacity:0.5; }
+    100%{ opacity:0; transform: translateX(var(--streak-dist)); }
+  }
+
+  .readout{
+    display:flex;
+    flex-direction:column;
+    gap: 18px;
+  }
+  .loc-line{
+    font-size: 13px;
+    color: var(--cream-dim);
+    letter-spacing: 0.04em;
+  }
+  .loc-line b{ color: var(--cream); }
+  .loc-detail{
+    font-size: 11px;
+    color: var(--cream-dim);
+    letter-spacing: 0.03em;
+    margin-top: 3px;
+  }
+  .loc-detail .coord{ color: var(--phosphor); }
+
+  .temp-row{
+    display:flex;
+    align-items:flex-end;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+  .temp-big{
+    font-family:'Archivo Expanded', sans-serif;
+    font-weight:700;
+    font-size: 76px;
+    line-height:0.9;
+    color: var(--cream);
+    letter-spacing: -0.01em;
+  }
+  .temp-unit{ font-size:34px; color: var(--phosphor); }
+  .condition-block{
+    padding-bottom: 10px;
+  }
+  .condition-text{
+    font-size: 15px;
+    color: var(--phosphor);
+    font-weight:500;
+  }
+  .hilo{ font-size: 12px; color: var(--cream-dim); margin-top:4px; }
+
+  .stat-grid{
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .stat{
+    background: #081712;
+    border: 1px solid #1c3327;
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .stat-label{ font-size:10px; color: var(--cream-dim); letter-spacing:0.08em; }
+  .stat-value{ font-size:17px; color: var(--cream); margin-top:4px; font-weight:500;}
+  .stat-value.amber{ color: var(--amber); }
+
+  .track-title{
+    font-size: 11px;
+    color: var(--cream-dim);
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+  .track{
+    display:flex;
+    gap: 6px;
+    align-items:flex-end;
+    height: 64px;
+    padding: 0 2px;
+  }
+  .track-bar{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap: 4px;
+  }
+  .bar-fill{
+    width: 100%;
+    background: linear-gradient(180deg, var(--amber) 0%, rgba(255,177,78,0.25) 100%);
+    border-radius: 3px 3px 0 0;
+    min-height: 2px;
+  }
+  .bar-label{ font-size: 9px; color: var(--cream-dim); }
+  .bar-pct{ font-size: 9px; color: var(--amber); }
+
+  .status{
+    font-size: 11px;
+    color: var(--cream-dim);
+    letter-spacing: 0.05em;
+    padding-top: 6px;
+    border-top: 1px solid #1c3327;
+  }
+  .status.err{ color: var(--danger); }
+  .dot-live{
+    display:inline-block;
+    width:6px; height:6px;
+    border-radius:50%;
+    background: var(--phosphor);
+    box-shadow: 0 0 6px var(--phosphor);
+    margin-right:6px;
+    animation: blink 1.6s ease-in-out infinite;
+  }
+  @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+  /* ===== World wind map ===== */
+  .map-section{
+    margin-top: 22px;
+    padding-top: 20px;
+    border-top: 1px solid #1c3327;
+  }
+  .map-head{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-bottom:12px;
+  }
+  .map-title{
+    font-family:'Archivo Expanded', sans-serif;
+    font-weight:700;
+    font-size: 14px;
+    letter-spacing: 0.06em;
+    color: var(--phosphor);
+    text-shadow: 0 0 12px rgba(85,255,171,0.3);
+  }
+  .map-title span{ color: var(--cream-dim); font-weight:600; font-family:'IBM Plex Mono', monospace; font-size:11px; letter-spacing:0.05em; }
+  .map-legend{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-size: 10px;
+    color: var(--cream-dim);
+    letter-spacing: 0.04em;
+  }
+  .map-legend .sw{ display:inline-flex; align-items:center; gap:5px; }
+  .map-legend .chip{ width:9px; height:9px; border-radius:2px; display:inline-block; }
+
+  .layer-tabs{
+    display:flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .layer-tab{
+    background: #071510;
+    border: 1px solid #1c3327;
+    color: var(--cream-dim);
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    padding: 6px 11px;
+    border-radius: 5px;
+    cursor:pointer;
+  }
+  .layer-tab:hover{ border-color: var(--phosphor); color: var(--cream); }
+  .layer-tab.active{
+    background: var(--phosphor-dim);
+    border-color: var(--phosphor);
+    color: var(--phosphor);
+  }
+  #fieldCanvas{
+    position:absolute;
+    top:0; left:0;
+    pointer-events:none;
+    z-index: 440;
+  }
+  #particleCanvas{
+    position:absolute;
+    top:0; left:0;
+    pointer-events:none;
+    z-index: 450;
+  }
+  .map-wrap{
+    position:relative;
+    width:100%;
+    height: 380px;
+    border-radius: 12px;
+    overflow:hidden;
+    border: 1px solid #1c3327;
+    box-shadow: inset 0 0 30px rgba(0,0,0,0.6), 0 0 0 6px #0a1a13;
+    background: #03110c;
+  }
+  #worldMap{ width:100%; height:100%; background:#03110c; }
+  .leaflet-tile-pane{ filter: saturate(1.05); }
+  .leaflet-control-zoom a{
+    background: #0a1a13 !important;
+    color: var(--phosphor) !important;
+    border-color: #1c3327 !important;
+  }
+  .leaflet-control-zoom a:hover{ background:#122a1f !important; }
+  .leaflet-control-attribution{
+    background: rgba(6,20,15,0.75) !important;
+    color: var(--cream-dim) !important;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 9px !important;
+  }
+  .leaflet-control-attribution a{ color: var(--phosphor) !important; }
+  .wind-arrow-icon{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    pointer-events:none;
+  }
+  .wind-arrow-icon svg{ filter: drop-shadow(0 0 3px rgba(0,0,0,0.8)); }
+  .map-hint{
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--cream-dim);
+    letter-spacing: 0.04em;
+  }
+  .map-hint b{ color: var(--amber); font-weight:600; }
+  .map-loading{
+    position:absolute;
+    top:10px; left:12px;
+    z-index: 1000;
+    font-size: 10px;
+    color: var(--phosphor);
+    letter-spacing: 0.06em;
+    background: rgba(6,20,15,0.75);
+    padding: 4px 9px;
+    border-radius: 5px;
+    border: 1px solid #1c3327;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  .map-loading.on{ opacity:1; }
+</style>
+</head>
+<body>
+
+<div class="console">
+  <div class="topbar">
+    <div class="brand">WEATHERMAN DEV <span>/// live scope</span></div>
+    <form class="search" id="searchForm">
+      <input type="text" id="cityInput" placeholder="Search city..." autocomplete="off">
+      <button type="submit">Track</button>
+    </form>
+  </div>
+
+  <div class="layout">
+    <div class="scope-wrap">
+      <div class="scope" id="scope">
+        <div class="ring" style="width:100%; height:100%;"></div>
+        <div class="ring" style="width:70%; height:70%;"></div>
+        <div class="ring" style="width:40%; height:40%;"></div>
+        <div class="crosshair h"></div>
+        <div class="crosshair v"></div>
+        <div class="compass n">N</div>
+        <div class="compass s">S</div>
+        <div class="compass e">E</div>
+        <div class="compass w">W</div>
+        <div class="scope-hud">
+          <span id="clockEl">--:--:--</span>
+          <span id="windDirEl">WND --</span>
+        </div>
+        <div id="cloudLayer"></div>
+        <div id="windLayer"></div>
+        <div class="sweep-fill"></div>
+        <div class="sweep"></div>
+        <div class="scope-center"></div>
+        <div id="blipLayer"></div>
+        <div class="scope-temp" id="scopeTemp">--°C</div>
+      </div>
+      <div class="scope-caption">Each return marks an hour ahead.<br>Distance from centre = <b>rain chance</b>.</div>
+    </div>
+
+    <div class="readout">
+      <div class="loc-line" id="locLine"><span class="dot-live"></span>Acquiring signal...</div>
+      <div class="loc-detail" id="locDetail"></div>
+
+      <div class="temp-row">
+        <div>
+          <div class="temp-big" id="tempBig">--<span class="temp-unit">°</span></div>
+        </div>
+        <div class="condition-block">
+          <div class="condition-text" id="conditionText">—</div>
+          <div class="hilo" id="hiloText">H: -- &nbsp; L: --</div>
+        </div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat">
+          <div class="stat-label">WIND</div>
+          <div class="stat-value" id="windVal">--</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">HUMIDITY</div>
+          <div class="stat-value" id="humVal">--</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">RAIN CHANCE</div>
+          <div class="stat-value amber" id="rainVal">--</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="track-title">NEXT 12 HOURS — precipitation probability</div>
+        <div class="track" id="trackBars"></div>
+      </div>
+
+      <div class="status" id="statusLine">Type a city and hit Track, or allow location.</div>
+    </div>
+  </div>
+
+  <div class="map-section">
+    <div class="map-head">
+      <div class="map-title">GLOBAL <span id="layerNoun">WIND</span> MAP <span>/// live grid — click anywhere to track</span></div>
+      <div class="map-legend" id="mapLegend"></div>
+    </div>
+    <div class="layer-tabs" id="layerTabs">
+      <button class="layer-tab active" data-layer="wind" type="button">WIND</button>
+      <button class="layer-tab" data-layer="temp" type="button">TEMP</button>
+      <button class="layer-tab" data-layer="rain" type="button">RAIN</button>
+      <button class="layer-tab" data-layer="clouds" type="button">CLOUDS</button>
+    </div>
+    <div class="map-wrap">
+      <div class="map-loading" id="mapLoading">SAMPLING WIND FIELD...</div>
+      <div id="worldMap"></div>
+    </div>
+    <div class="map-hint" id="mapHint">Streaks show the direction wind is <b>blowing toward</b> — brighter/warmer color means stronger wind. Click anywhere to re-centre the scope on that location.</div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const blipLayer = $('blipLayer');
+const scope = $('scope');
+
+function wmoToText(code){
+  const map = {
+    0:'Clear sky', 1:'Mostly clear', 2:'Partly cloudy', 3:'Overcast',
+    45:'Fog', 48:'Depositing fog',
+    51:'Light drizzle', 53:'Drizzle', 55:'Dense drizzle',
+    61:'Light rain', 63:'Rain', 65:'Heavy rain',
+    66:'Freezing rain', 67:'Heavy freezing rain',
+    71:'Light snow', 73:'Snow', 75:'Heavy snow', 77:'Snow grains',
+    80:'Light showers', 81:'Showers', 82:'Violent showers',
+    85:'Snow showers', 86:'Heavy snow showers',
+    95:'Thunderstorm', 96:'Thunderstorm w/ hail', 99:'Severe thunderstorm'
+  };
+  return map[code] || 'Unknown';
+}
+
+function windDir(deg){
+  const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  return dirs[Math.round(deg/22.5) % 16];
+}
+
+function plotBlips(hourlyProb){
+  blipLayer.innerHTML = '';
+  const centerX = 150, centerY = 150, maxR = 130;
+  const hours = hourlyProb.slice(0,12);
+  hours.forEach((prob, i) => {
+    const angle = (i / 12) * 360 - 90;
+    const rad = angle * Math.PI / 180;
+    const dist = 22 + (prob/100) * maxR;
+    const x = centerX + dist * Math.cos(rad);
+    const y = centerY + dist * Math.sin(rad);
+    const blip = document.createElement('div');
+    blip.className = 'blip' + (prob < 25 ? ' small' : '');
+    blip.style.left = x + 'px';
+    blip.style.top = y + 'px';
+    blip.style.opacity = Math.max(0.35, prob/100);
+    blipLayer.appendChild(blip);
+  });
+}
+
+function renderTrack(hourlyProb, hourlyTime){
+  const track = $('trackBars');
+  track.innerHTML = '';
+  hourlyProb.slice(0,12).forEach((prob, i) => {
+    const bar = document.createElement('div');
+    bar.className = 'track-bar';
+    const hourLabel = new Date(hourlyTime[i]).getHours();
+    bar.innerHTML = `
+      <div class="bar-pct">${prob}</div>
+      <div class="bar-fill" style="height:${Math.max(2, prob*0.5)}px;"></div>
+      <div class="bar-label">${hourLabel}h</div>
+    `;
+    track.appendChild(bar);
+  });
+}
+
+let clockTimer = null;
+let utcOffsetSeconds = 0;
+
+function startClock(){
+  if(clockTimer) clearInterval(clockTimer);
+  const tick = () => {
+    const nowMs = Date.now() + (utcOffsetSeconds*1000) - (new Date().getTimezoneOffset()*60000*0);
+    const localMs = Date.now() + utcOffsetSeconds*1000;
+    const d = new Date(localMs);
+    const hh = String(d.getUTCHours()).padStart(2,'0');
+    const mm = String(d.getUTCMinutes()).padStart(2,'0');
+    const ss = String(d.getUTCSeconds()).padStart(2,'0');
+    $('clockEl').textContent = `${hh}:${mm}:${ss}`;
+  };
+  tick();
+  clockTimer = setInterval(tick, 1000);
+}
+
+function renderClouds(cloudCoverPct){
+  const layer = $('cloudLayer');
+  layer.innerHTML = '';
+  const count = Math.max(1, Math.round((cloudCoverPct/100) * 5));
+  for(let i=0; i<count; i++){
+    const cloud = document.createElement('div');
+    cloud.className = 'cloud';
+    const size = 60 + Math.random()*90;
+    const top = 20 + Math.random()*230;
+    const duration = 14 + Math.random()*14;
+    const delay = -Math.random()*duration;
+    cloud.style.width = size + 'px';
+    cloud.style.height = (size*0.55) + 'px';
+    cloud.style.top = top + 'px';
+    cloud.style.animationDuration = duration + 's';
+    cloud.style.animationDelay = delay + 's';
+    layer.appendChild(cloud);
+  }
+}
+
+function renderWind(speedKmh, dirDeg){
+  const layer = $('windLayer');
+  layer.innerHTML = '';
+  $('windDirEl').textContent = `WND ${windDir(dirDeg)} ${Math.round(speedKmh)}km/h`;
+  // wind blows FROM dirDeg, so streaks travel in the opposite (to) direction
+  const toDeg = (dirDeg + 180) % 360;
+  const rad = toDeg * Math.PI / 180;
+  const dx = Math.sin(rad), dy = -Math.cos(rad);
+  const dist = 220;
+  const speedFactor = Math.max(0.4, Math.min(2.2, speedKmh/20));
+  const streakCount = Math.min(10, Math.max(3, Math.round(speedKmh/6)));
+
+  for(let i=0; i<streakCount; i++){
+    const s = document.createElement('div');
+    s.className = 'wind-streak';
+    const len = 20 + Math.random()*24;
+    const startX = 150 - dx*130 + (Math.random()-0.5)*180;
+    const startY = 150 - dy*130 + (Math.random()-0.5)*180;
+    s.style.width = len + 'px';
+    s.style.left = startX + 'px';
+    s.style.top = startY + 'px';
+    s.style.transform = `rotate(${toDeg}deg)`;
+    s.style.setProperty('--streak-dist', `${dist}px`);
+    const duration = (3.5 / speedFactor) + Math.random()*1.2;
+    s.style.animationDuration = duration + 's';
+    s.style.animationDelay = (-Math.random()*duration) + 's';
+    layer.appendChild(s);
+  }
+}
+
+async function loadWeather(lat, lon, label, place = {}){
+  $('statusLine').textContent = 'Fetching signal...';
+  $('statusLine').classList.remove('err');
+  try{
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,relative_humidity_2m,cloud_cover&hourly=precipitation_probability,temperature_2m&daily=temperature_2m_max,temperature_2m_min&temperature_unit=celsius&wind_speed_unit=kmh&timezone=auto`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    utcOffsetSeconds = data.utc_offset_seconds || 0;
+    startClock();
+    renderClouds(data.current.cloud_cover ?? 40);
+    renderWind(data.current.wind_speed_10m, data.current.wind_direction_10m);
+    $('scopeTemp').textContent = Math.round(data.current.temperature_2m) + '°C';
+
+    const cur = data.current;
+    $('locLine').innerHTML = `<span class="dot-live"></span><b>${label}</b>`;
+    const coordLabel = `${lat.toFixed(2)}°, ${lon.toFixed(2)}°`;
+    const detailParts = [place.district, place.state, place.country].filter(Boolean);
+    $('locDetail').innerHTML = detailParts.length
+      ? `${detailParts.join(' · ')} <span class="coord">— ${coordLabel}</span>`
+      : `<span class="coord">${coordLabel}</span>`;
+    $('tempBig').innerHTML = Math.round(cur.temperature_2m) + '<span class="temp-unit">°C</span>';
+    $('conditionText').textContent = wmoToText(cur.weather_code);
+    $('hiloText').textContent = `H: ${Math.round(data.daily.temperature_2m_max[0])}°  L: ${Math.round(data.daily.temperature_2m_min[0])}°`;
+    $('windVal').textContent = `${Math.round(cur.wind_speed_10m)} km/h ${windDir(cur.wind_direction_10m)}`;
+    $('humVal').textContent = `${cur.relative_humidity_2m}%`;
+
+    const nowHourIdx = data.hourly.time.findIndex(t => new Date(t) >= new Date(cur.time));
+    const startIdx = nowHourIdx >= 0 ? nowHourIdx : 0;
+    const probs = data.hourly.precipitation_probability.slice(startIdx, startIdx+12);
+    const times = data.hourly.time.slice(startIdx, startIdx+12);
+
+    $('rainVal').textContent = `${probs[0] ?? 0}%`;
+    plotBlips(probs);
+    renderTrack(probs, times);
+
+    $('statusLine').textContent = 'Signal locked. Data via Open-Meteo.';
+  }catch(err){
+    $('statusLine').textContent = 'Lost signal — check the city name and try again.';
+    $('statusLine').classList.add('err');
+  }
+}
+
+async function geocodeAndLoad(city){
+  $('statusLine').textContent = 'Searching...';
+  try{
+    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`);
+    const data = await res.json();
+    if(!data.results || data.results.length === 0){
+      $('statusLine').textContent = 'No station found for that city.';
+      $('statusLine').classList.add('err');
+      return;
+    }
+    const r = data.results[0];
+    const label = [r.name, r.admin1, r.country].filter(Boolean).join(', ');
+    loadWeather(r.latitude, r.longitude, label, {
+      district: r.admin2 || null,
+      state: r.admin1 || null,
+      country: r.country || null
+    });
+  }catch(err){
+    $('statusLine').textContent = 'Lost signal — try again.';
+    $('statusLine').classList.add('err');
+  }
+}
+
+$('searchForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const city = $('cityInput').value.trim();
+  if(city) geocodeAndLoad(city);
+});
+
+// ===== World weather map (windy.com-style layers) =====
+// interpolated colour ramps, one per layer
+function makeRamp(stops){
+  return function(v){
+    const x = Math.max(stops[0][0], Math.min(stops[stops.length-1][0], v));
+    for(let i = 0; i < stops.length - 1; i++){
+      const [v0, c0] = stops[i];
+      const [v1, c1] = stops[i+1];
+      if(x >= v0 && x <= v1){
+        const t = v1 === v0 ? 0 : (x - v0) / (v1 - v0);
+        const r = Math.round(c0[0] + (c1[0]-c0[0])*t);
+        const g = Math.round(c0[1] + (c1[1]-c0[1])*t);
+        const b = Math.round(c0[2] + (c1[2]-c0[2])*t);
+        return [r,g,b];
+      }
+    }
+    return stops[stops.length-1][1];
+  };
+}
+
+const LAYERS = {
+  wind: {
+    label: 'WIND', noun: 'WIND', unit: 'km/h',
+    current: 'wind_speed_10m,wind_direction_10m',
+    stops: [
+      [0,   [178, 224, 242]], [10,  [143, 214, 242]], [20,  [110, 198, 232]],
+      [30,  [ 79, 209, 197]], [40,  [107, 207,  99]], [50,  [168, 216,  74]],
+      [60,  [255, 217,  61]], [70,  [255, 154,  61]], [80,  [255,  94,  94]],
+      [90,  [193,  79, 217]], [100, [154,  61, 217]], [130, [106,  47, 176]]
+    ],
+    legendSteps: [0,20,40,60,70,80,90,100],
+    hint: 'Streaks show the direction wind is <b>blowing toward</b> — brighter/warmer color means stronger wind. Click anywhere to re-centre the scope on that location.'
+  },
+  temp: {
+    label: 'TEMP', noun: 'TEMPERATURE', unit: '°C',
+    current: 'temperature_2m',
+    stops: [
+      [-20, [ 92, 118, 219]], [-5, [104, 189, 224]], [5,  [120, 214, 189]],
+      [15,  [206, 214, 100]], [25, [237, 160,  70]], [35, [224,  89,  63]],
+      [45,  [163,  47,  95]]
+    ],
+    legendSteps: [-20,-5,5,15,25,35,45],
+    hint: 'Color marks the current air temperature across the grid. Click anywhere to re-centre the scope on that location.'
+  },
+  rain: {
+    label: 'RAIN', noun: 'RAINFALL', unit: 'mm/h',
+    current: 'precipitation',
+    stops: [
+      [0, [11, 21, 18]], [0.2, [79, 158, 209]], [2, [79, 209, 197]],
+      [6, [107, 207, 99]], [12, [193, 79, 217]], [25, [106, 47, 176]]
+    ],
+    legendSteps: [0,0.2,2,6,12,25],
+    hint: 'Color marks current rainfall intensity across the grid. Click anywhere to re-centre the scope on that location.'
+  },
+  clouds: {
+    label: 'CLOUDS', noun: 'CLOUD COVER', unit: '%',
+    current: 'cloud_cover',
+    stops: [
+      [0, [11, 21, 18]], [25, [79, 158, 209]], [50, [143, 178, 190]],
+      [75, [196, 210, 205]], [100, [230, 236, 233]]
+    ],
+    legendSteps: [0,25,50,75,100],
+    hint: 'Color marks current cloud cover across the grid. Click anywhere to re-centre the scope on that location.'
+  }
+};
+
+let currentLayer = 'wind';
+let worldMap = null;
+let pickMarker = null;
+let mapDebounce = null;
+let windField = null;        // { south,north,west,east, cols, rows, speeds[], dirs[] }
+let particles = [];
+let particleCanvas = null, particleCtx = null;
+let fieldCanvas = null, fieldCtx = null;       // visible, screen-sized canvas for temp/rain/clouds
+let fieldDataCanvas = null, fieldDataCtx = null; // tiny cols x rows canvas holding raw cell colors
+let fieldBounds = null;      // { south, north, west, east } matching the last sample
+const PARTICLE_COUNT = 340;
+
+function renderLegend(layerKey){
+  const def = LAYERS[layerKey];
+  const ramp = makeRamp(def.stops);
+  const legend = $('mapLegend');
+  legend.innerHTML = def.legendSteps.map((v, i) => {
+    const [r,g,b] = ramp(v);
+    const isLast = i === def.legendSteps.length - 1;
+    const label = isLast ? `${v}+` : `${v}–${def.legendSteps[i+1]}`;
+    return `<span class="sw"><span class="chip" style="background:rgb(${r},${g},${b});"></span>${label}</span>`;
+  }).join('');
+  $('layerNoun').textContent = def.noun;
+  $('mapHint').innerHTML = def.hint;
+  $('mapLoading').textContent = `SAMPLING ${def.label} FIELD...`;
+}
+
+function initWorldMap(){
+  worldMap = L.map('worldMap', { worldCopyJump: true, minZoom: 2, maxZoom: 9 }).setView([13.0827, 80.2707], 3);
+
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ &mdash; wind engine inspired by windy.com',
+    maxZoom: 12
+  }).addTo(worldMap);
+
+  // reference layer draws country borders, place names and city labels on top
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 12,
+    pane: 'shadowPane'
+  }).addTo(worldMap);
+
+  initOverlayCanvases();
+
+  worldMap.on('moveend', () => {
+    resizeOverlayCanvases();
+    clearTimeout(mapDebounce);
+    mapDebounce = setTimeout(sampleLayerField, 350);
+  });
+
+  worldMap.on('click', (e) => {
+    setPickMarker(e.latlng.lat, e.latlng.lng);
+    reverseGeocodeAndLoad(e.latlng.lat, e.latlng.lng);
+  });
+
+  document.querySelectorAll('.layer-tab').forEach(btn => {
+    btn.addEventListener('click', () => setActiveLayer(btn.dataset.layer));
+  });
+
+  renderLegend(currentLayer);
+  resizeOverlayCanvases();
+  sampleLayerField();
+  requestAnimationFrame(animateOverlays);
+}
+
+function setActiveLayer(layerKey){
+  if(layerKey === currentLayer) return;
+  currentLayer = layerKey;
+  document.querySelectorAll('.layer-tab').forEach(b => b.classList.toggle('active', b.dataset.layer === layerKey));
+  renderLegend(layerKey);
+  particles = [];
+  fieldBounds = null;
+  if(particleCtx) particleCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+  if(fieldCtx) fieldCtx.clearRect(0, 0, fieldCanvas.width, fieldCanvas.height);
+  sampleLayerField();
+}
+
+function setPickMarker(lat, lon){
+  if(pickMarker) worldMap.removeLayer(pickMarker);
+  pickMarker = L.circleMarker([lat, lon], {
+    radius: 7,
+    color: '#ffb14e',
+    weight: 2,
+    fillColor: '#ffb14e',
+    fillOpacity: 0.35
+  }).addTo(worldMap);
+}
+
+async function sampleLayerField(){
+  if(!worldMap) return;
+  const def = LAYERS[currentLayer];
+  const bounds = worldMap.getBounds();
+  const south = Math.max(bounds.getSouth(), -70);
+  const north = Math.min(bounds.getNorth(), 78);
+  const west = bounds.getWest();
+  const east = bounds.getEast();
+
+  const cols = 10, rows = 6;
+  const lats = [], lons = [];
+  for(let r = 0; r < rows; r++){
+    for(let c = 0; c < cols; c++){
+      const lat = south + (north - south) * ((r + 0.5) / rows);
+      let lon = west + (east - west) * ((c + 0.5) / cols);
+      lon = ((lon + 180) % 360 + 360) % 360 - 180; // normalize to -180..180
+      lats.push(lat.toFixed(2));
+      lons.push(lon.toFixed(2));
+    }
+  }
+
+  const loadingEl = $('mapLoading');
+  loadingEl.classList.add('on');
+  try{
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats.join(',')}&longitude=${lons.join(',')}&current=${def.current}&wind_speed_unit=kmh&temperature_unit=celsius`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const points = Array.isArray(data) ? data : [data];
+
+    if(currentLayer === 'wind'){
+      const speeds = points.map(p => p && p.current ? p.current.wind_speed_10m : null);
+      const dirs = points.map(p => p && p.current ? p.current.wind_direction_10m : null);
+      windField = { south, north, west, east, cols, rows, speeds, dirs };
+      fieldBounds = null;
+    }else{
+      windField = null;
+      const ramp = makeRamp(def.stops);
+      const key = def.current.split(',')[0];
+      // paint each sampled cell as one pixel of a tiny canvas — the browser's
+      // own bilinear upscaling turns that into a smooth colour field instead of hard boxes
+      fieldDataCtx.clearRect(0, 0, cols, rows);
+      points.forEach((p, i) => {
+        const val = p && p.current ? p.current[key] : null;
+        const c = i % cols, r = Math.floor(i / cols);
+        if(val == null){ return; }
+        const [red, g, b] = ramp(val);
+        const alpha = (currentLayer === 'rain' && val <= 0) ? 0 : 0.62;
+        fieldDataCtx.fillStyle = `rgba(${red},${g},${b},${alpha})`;
+        fieldDataCtx.fillRect(c, r, 1, 1);
+      });
+      fieldBounds = { south, north, west, east };
+    }
+  }catch(err){
+    // silent fail — keep last known field on the map
+  }finally{
+    loadingEl.classList.remove('on');
+  }
+}
+
+// ===== windy.com-style animated wind particles + smooth colour fields =====
+function initOverlayCanvases(){
+  fieldCanvas = document.createElement('canvas');
+  fieldCanvas.id = 'fieldCanvas';
+  worldMap.getContainer().appendChild(fieldCanvas);
+  fieldCtx = fieldCanvas.getContext('2d');
+  fieldCtx.imageSmoothingEnabled = true;
+
+  fieldDataCanvas = document.createElement('canvas');
+  fieldDataCanvas.width = 10;
+  fieldDataCanvas.height = 6;
+  fieldDataCtx = fieldDataCanvas.getContext('2d');
+
+  particleCanvas = document.createElement('canvas');
+  particleCanvas.id = 'particleCanvas';
+  worldMap.getContainer().appendChild(particleCanvas);
+  particleCtx = particleCanvas.getContext('2d');
+}
+
+function resizeOverlayCanvases(){
+  if(!worldMap) return;
+  const size = worldMap.getSize();
+  if(fieldCanvas){ fieldCanvas.width = size.x; fieldCanvas.height = size.y; }
+  if(particleCanvas){ particleCanvas.width = size.x; particleCanvas.height = size.y; }
+}
+
+function fieldAt(lat, lon){
+  if(!windField) return null;
+  const { south, north, west, east, cols, rows, speeds, dirs } = windField;
+  if(lat < south || lat > north) return null;
+  let lonN = lon;
+  if(lonN < west) lonN += 360;
+  if(lonN > east) lonN -= 360;
+  if(lonN < west || lonN > east) return null;
+  const c = Math.min(cols - 1, Math.max(0, Math.floor(((lonN - west) / (east - west)) * cols)));
+  const r = Math.min(rows - 1, Math.max(0, Math.floor(((lat - south) / (north - south)) * rows)));
+  const idx = r * cols + c;
+  const speed = speeds[idx], dir = dirs[idx];
+  if(speed == null || dir == null) return null;
+  return { speed, dir };
+}
+
+function spawnParticle(){
+  if(!worldMap) return null;
+  const bounds = worldMap.getBounds();
+  const lat = bounds.getSouth() + Math.random() * (bounds.getNorth() - bounds.getSouth());
+  const lon = bounds.getWest() + Math.random() * (bounds.getEast() - bounds.getWest());
+  return { lat, lon, age: Math.random() * 60, maxAge: 40 + Math.random() * 50 };
+}
+
+function drawFieldLayer(){
+  const w = fieldCanvas.width, h = fieldCanvas.height;
+  fieldCtx.clearRect(0, 0, w, h);
+  if(currentLayer === 'wind' || !fieldBounds) return;
+  const nw = worldMap.latLngToContainerPoint([fieldBounds.north, fieldBounds.west]);
+  const se = worldMap.latLngToContainerPoint([fieldBounds.south, fieldBounds.east]);
+  fieldCtx.imageSmoothingEnabled = true;
+  fieldCtx.drawImage(fieldDataCanvas, 0, 0, fieldDataCanvas.width, fieldDataCanvas.height,
+    nw.x, nw.y, se.x - nw.x, se.y - nw.y);
+}
+
+function animateOverlays(){
+  if(fieldCtx && worldMap) drawFieldLayer();
+
+  if(particleCtx && worldMap){
+    const w = particleCanvas.width, h = particleCanvas.height;
+    if(currentLayer !== 'wind' || !windField){
+      particleCtx.clearRect(0, 0, w, h);
+      particles = [];
+    }else{
+      if(particles.length < PARTICLE_COUNT){
+        while(particles.length < PARTICLE_COUNT) particles.push(spawnParticle());
+      }
+      particleCtx.globalCompositeOperation = 'destination-out';
+      particleCtx.fillStyle = 'rgba(0,0,0,0.10)';
+      particleCtx.fillRect(0, 0, w, h);
+      particleCtx.globalCompositeOperation = 'source-over';
+      particleCtx.lineWidth = 1.3;
+
+      particles.forEach((p, i) => {
+        const f = fieldAt(p.lat, p.lon);
+        p.age++;
+        if(!f || p.age > p.maxAge){
+          particles[i] = spawnParticle();
+          return;
+        }
+        const p0 = worldMap.latLngToContainerPoint([p.lat, p.lon]);
+        if(p0.x < -20 || p0.x > w + 20 || p0.y < -20 || p0.y > h + 20){
+          particles[i] = spawnParticle();
+          return;
+        }
+        const toDeg = (f.dir + 180) % 360;
+        const rad = toDeg * Math.PI / 180;
+        const step = 0.35 + Math.min(2.6, f.speed / 22);
+        const p1 = L.point(p0.x + Math.sin(rad) * step * 3.4, p0.y - Math.cos(rad) * step * 3.4);
+        const [r, g, b] = makeRamp(LAYERS.wind.stops)(f.speed);
+        particleCtx.strokeStyle = `rgba(${r},${g},${b},0.85)`;
+        particleCtx.beginPath();
+        particleCtx.moveTo(p0.x, p0.y);
+        particleCtx.lineTo(p1.x, p1.y);
+        particleCtx.stroke();
+        const newLatLng = worldMap.containerPointToLatLng(p1);
+        p.lat = newLatLng.lat;
+        p.lon = newLatLng.lng;
+      });
+    }
+  }
+  requestAnimationFrame(animateOverlays);
+}
+
+async function reverseGeocodeAndLoad(lat, lon){
+  const coordLabel = `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+  $('statusLine').textContent = 'Identifying location...';
+
+  let label = coordLabel;
+  let place = {};
+  let popupText = coordLabel;
+
+  try{
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=jsonv2&zoom=10&accept-language=en`);
+    const data = await res.json();
+    const a = data.address || {};
+    const cityName = a.city || a.town || a.village || a.hamlet || a.suburb || a.county || null;
+
+    place = {
+      district: (a.county && a.county !== cityName) ? a.county : (a.state_district || null),
+      state: a.state || a.region || null,
+      country: a.country || null
+    };
+
+    if(cityName){
+      label = [cityName, a.state, a.country].filter(Boolean).join(', ');
+    }else if(a.country){
+      label = [a.state, a.country].filter(Boolean).join(', ');
+    }
+
+    const detailParts = [place.district, place.state, place.country].filter(Boolean);
+    popupText = `<b>${cityName || label}</b>${detailParts.length ? '<br>' + detailParts.join(', ') : ''}`;
+  }catch(err){
+    // reverse geocoding failed — fall back to raw coordinates
+  }
+
+  if(pickMarker) pickMarker.bindPopup(popupText).openPopup();
+  loadWeather(lat, lon, label, place);
+}
+
+initWorldMap();
+
+// default: Chennai
+loadWeather(13.0827, 80.2707, 'Chennai, Tamil Nadu, India', {
+  district: 'Chennai',
+  state: 'Tamil Nadu',
+  country: 'India'
+});
+</script>
+</body>
+</html>
